@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id        String   @id @default(uuid())
+  name      String
+  gstin     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     BusinessUser[]
+  customers Customer[]
+  products  Product[]
+  invoices  TaxInvoice[]
+  suppliers Supplier[]
+  warehouses Warehouse[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  businesses BusinessUser[]
+}
+
+model BusinessUser {
+  id         String   @id @default(uuid())
+  userId     String
+  businessId String
+  role       String   @default("USER")
+  user       User     @relation(fields: [userId], references: [id])
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model Customer {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  gstin      String?
+  business   Business @relation(fields: [businessId], references: [id])
+  invoices   TaxInvoice[]
+}
+
+model Supplier {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  gstin      String?
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model Warehouse {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model Product {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  hsn        String?
+  price      Float
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model TaxInvoice {
+  id         String   @id @default(uuid())
+  businessId String
+  customerId String
+  invoiceNo  String
+  date       DateTime @default(now())
+  total      Float
+  business   Business @relation(fields: [businessId], references: [id])
+  customer   Customer @relation(fields: [customerId], references: [id])
+}
