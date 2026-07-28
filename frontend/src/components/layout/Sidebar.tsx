@@ -1,34 +1,19 @@
 import React from 'react';
 import {
   Box, List, ListItemButton, ListItemIcon, ListItemText,
-  Collapse, Typography, Divider, Tooltip, alpha, useTheme,
+  Typography, Divider, Tooltip, alpha, useTheme,
 } from '@mui/material';
 import {
-  Dashboard, People, ShoppingCart, LocalShipping, Receipt,
-  Payment, Inventory2, Warehouse, AccountBalance, Article,
-  AccountBalanceWallet, TrendingUp, Assessment, Gavel,
-  Settings, ExpandLess, ExpandMore, Store, CurrencyRupee,
-  BookOnline, Assignment, Summarize, BarChart, Calculate,
-  FolderOpen, ReceiptLong, ManageAccounts, CalendarMonth,
-  SyncAlt,
+  Dashboard, People, ShoppingCart, Inventory2, AccountBalance,
+  Assessment, Settings, TrendingUp,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useUIStore } from '../../stores/uiStore';
-
-interface NavItem {
-  label: string;
-  icon: React.ReactNode;
-  path?: string;
-  children?: NavItem[];
-  badge?: string;
-}
 
 interface NavGroup {
   group: string;
   icon: React.ReactNode;
   color: string;
   defaultPath: string;
-  items: NavItem[];
 }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -37,90 +22,42 @@ const NAV_GROUPS: NavGroup[] = [
     icon: <TrendingUp />,
     color: '#43A047',
     defaultPath: '/sales/dashboard',
-    items: [
-      { label: 'Sales Dashboard', icon: <Dashboard />, path: '/sales/dashboard' },
-      { label: 'Customer Dashboard', icon: <People />, path: '/sales/customers-dashboard' },
-      { label: 'Customers', icon: <People />, path: '/sales/customers' },
-      { label: 'Sales Orders', icon: <Assignment />, path: '/sales/orders' },
-      { label: 'Delivery Challans', icon: <LocalShipping />, path: '/sales/challans' },
-      { label: 'Tax Invoices', icon: <ReceiptLong />, path: '/sales/invoices' },
-      { label: 'Customer Payments', icon: <CurrencyRupee />, path: '/sales/payments' },
-      { label: 'Credit Notes', icon: <Receipt />, path: '/sales/credit-notes' },
-    ],
   },
   {
     group: 'Purchases',
     icon: <ShoppingCart />,
     color: '#E53935',
     defaultPath: '/purchases/dashboard',
-    items: [
-      { label: 'Purchase Dashboard', icon: <Dashboard />, path: '/purchases/dashboard' },
-      { label: 'Suppliers', icon: <Store />, path: '/purchases/suppliers' },
-      { label: 'Purchase Orders', icon: <BookOnline />, path: '/purchases/orders' },
-      { label: 'Goods Receipt', icon: <FolderOpen />, path: '/purchases/grn' },
-      { label: 'Purchase Invoices', icon: <Receipt />, path: '/purchases/invoices' },
-      { label: 'Supplier Payments', icon: <Payment />, path: '/purchases/payments' },
-    ],
   },
   {
     group: 'Employees',
     icon: <People />,
     color: '#00897B',
     defaultPath: '/employees/dashboard',
-    items: [
-      { label: 'Employee Dashboard', icon: <Dashboard />, path: '/employees/dashboard' },
-    ],
   },
   {
     group: 'Inventory',
     icon: <Inventory2 />,
     color: '#0288D1',
     defaultPath: '/inventory/dashboard',
-    items: [
-      { label: 'Inventory Dashboard', icon: <Dashboard />, path: '/inventory/dashboard' },
-      { label: 'Products', icon: <Inventory2 />, path: '/inventory/products' },
-      { label: 'Warehouses', icon: <Warehouse />, path: '/inventory/warehouses' },
-      { label: 'Stock Ledger', icon: <SyncAlt />, path: '/inventory/stock-ledger' },
-    ],
   },
   {
     group: 'Finance',
     icon: <AccountBalance />,
     color: '#7B1FA2',
-    defaultPath: '/finance/accounts',
-    items: [
-      { label: 'Expense Dashboard', icon: <ReceiptLong />, path: '/finance/expenses-dashboard' },
-      { label: 'Loan Dashboard', icon: <AccountBalance />, path: '/finance/loans-dashboard' },
-      { label: 'Chart of Accounts', icon: <AccountBalance />, path: '/finance/accounts' },
-      { label: 'Journal Entries', icon: <Article />, path: '/finance/journal' },
-      { label: 'Bank Accounts', icon: <AccountBalanceWallet />, path: '/finance/banks' },
-      { label: 'Opening Balances', icon: <Calculate />, path: '/finance/opening-balances' },
-    ],
+    defaultPath: '/finance/dashboard',
   },
   {
     group: 'Reports',
     icon: <Assessment />,
     color: '#F9A825',
-    defaultPath: '/reports/finance-dashboard',
-    items: [
-      { label: 'Financial Reports', icon: <Assessment />, path: '/reports/finance-dashboard' },
-      { label: 'GST Dashboard', icon: <Gavel />, path: '/reports/gst-dashboard' },
-      { label: 'P&L Statement', icon: <BarChart />, path: '/reports/profit-loss' },
-      { label: 'Balance Sheet', icon: <Summarize />, path: '/reports/balance-sheet' },
-      { label: 'Trial Balance', icon: <Assessment />, path: '/reports/trial-balance' },
-      { label: 'GST Reports', icon: <Gavel />, path: '/reports/gst' },
-    ],
+    defaultPath: '/reports/dashboard',
   },
   {
     group: 'Settings',
     icon: <Settings />,
     color: '#5A5D72',
-    defaultPath: '/settings/business',
-    items: [
-      { label: 'Business Profile', icon: <ManageAccounts />, path: '/settings/business' },
-      { label: 'Financial Years', icon: <CalendarMonth />, path: '/settings/financial-years' },
-      { label: 'Users & Roles', icon: <People />, path: '/settings/users' },
-    ],
+    defaultPath: '/settings/dashboard',
   },
 ];
 
@@ -133,24 +70,17 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onNavClick }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { sidebarExpandedGroups, toggleGroup } = useUIStore();
 
   const isDark = theme.palette.mode === 'dark';
 
-  const isActive = (path?: string) => path && location.pathname === path;
-  const isGroupActive = (items: NavItem[]) =>
-    items.some((item) => item.path && location.pathname.startsWith(item.path.split('/').slice(0, 2).join('/')));
+  const isGroupActive = (defaultPath: string) => {
+    const groupBasePath = defaultPath.split('/').slice(0, 2).join('/');
+    return location.pathname.startsWith(groupBasePath);
+  };
 
   const handleNav = (path: string) => {
     navigate(path);
     onNavClick?.();
-  };
-
-  const handleGroupHeaderClick = (groupName: string, defaultPath: string) => {
-    if (!sidebarExpandedGroups.includes(groupName)) {
-      toggleGroup(groupName);
-    }
-    handleNav(defaultPath);
   };
 
   return (
@@ -235,105 +165,53 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onNavClick }) => {
         <Divider sx={{ mx: 2, my: 1, opacity: 0.5 }} />
 
         {/* Groups */}
-        {NAV_GROUPS.map((group) => {
-          const isExpanded = sidebarExpandedGroups.includes(group.group);
-          const groupActive = isGroupActive(group.items);
+        <List dense disablePadding>
+          {NAV_GROUPS.map((group) => {
+            const groupActive = isGroupActive(group.defaultPath);
 
-          return (
-            <Box key={group.group} mb={0.5}>
-              {!collapsed ? (
-                <>
-                  {/* Tapping group header expands AND loads corresponding dashboard instantly */}
+            return (
+              <Box key={group.group} mb={0.5}>
+                <Tooltip title={collapsed ? group.group : ''} placement="right">
                   <ListItemButton
-                    onClick={() => handleGroupHeaderClick(group.group, group.defaultPath)}
+                    selected={groupActive}
+                    onClick={() => handleNav(group.defaultPath)}
                     sx={{
-                      mx: 1, borderRadius: 2.5, minHeight: 40, px: 1.5,
+                      mx: 1, borderRadius: 2.5, minHeight: 44, px: 1.5,
+                      justifyContent: collapsed ? 'center' : 'flex-start',
                       bgcolor: groupActive ? alpha(group.color, 0.08) : 'transparent',
                       '&:hover': { bgcolor: alpha(group.color, 0.12) },
+                      '&.Mui-selected': {
+                        bgcolor: alpha(group.color, 0.12),
+                        '&:hover': { bgcolor: alpha(group.color, 0.16) },
+                      },
                     }}
                   >
                     <ListItemIcon
                       sx={{
-                        minWidth: 36,
+                        minWidth: collapsed ? 0 : 36,
                         color: groupActive ? group.color : 'text.secondary',
                       }}
                     >
-                      {group.icon}
+                      {React.cloneElement(group.icon as React.ReactElement, {
+                        sx: { fontSize: collapsed ? 20 : 24 }
+                      })}
                     </ListItemIcon>
-                    <ListItemText
-                      primary={group.group}
-                      primaryTypographyProps={{
-                        fontWeight: 700,
-                        fontSize: '0.75rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        color: groupActive ? group.color : 'text.secondary',
-                      }}
-                    />
-                    {isExpanded ? (
-                      <ExpandLess sx={{ color: 'text.secondary', fontSize: 18 }} />
-                    ) : (
-                      <ExpandMore sx={{ color: 'text.secondary', fontSize: 18 }} />
+                    {!collapsed && (
+                      <ListItemText
+                        primary={group.group}
+                        primaryTypographyProps={{
+                          fontWeight: groupActive ? 700 : 500,
+                          fontSize: '0.875rem',
+                          color: groupActive ? group.color : 'text.primary',
+                        }}
+                      />
                     )}
                   </ListItemButton>
-
-                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                    <List dense disablePadding>
-                      {group.items.map((item) => (
-                        <ListItemButton
-                          key={item.label}
-                          selected={isActive(item.path)}
-                          onClick={() => item.path && handleNav(item.path)}
-                          sx={{
-                            mx: 1, borderRadius: 2.5, minHeight: 38,
-                            pl: 2.5, pr: 1.5,
-                            '&.Mui-selected': {
-                              bgcolor: alpha(group.color, 0.12),
-                              '& .MuiListItemIcon-root': { color: group.color },
-                              '& .MuiListItemText-primary': { color: group.color, fontWeight: 700 },
-                            },
-                          }}
-                        >
-                          <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary', fontSize: 18 }}>
-                            {React.cloneElement(item.icon as React.ReactElement, { sx: { fontSize: 18 } })}
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={item.label}
-                            primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 500 }}
-                          />
-                        </ListItemButton>
-                      ))}
-                    </List>
-                  </Collapse>
-                </>
-              ) : (
-                // Collapsed mode: tapping main group icon directly navigates to group dashboard
-                <List dense disablePadding>
-                  <Tooltip title={group.group} placement="right">
-                    <ListItemButton
-                      selected={groupActive}
-                      onClick={() => handleNav(group.defaultPath)}
-                      sx={{
-                        mx: 1, borderRadius: 2.5, minHeight: 40,
-                        justifyContent: 'center', px: 1.5,
-                        bgcolor: groupActive ? alpha(group.color, 0.12) : 'transparent',
-                        '&.Mui-selected': {
-                          bgcolor: alpha(group.color, 0.12),
-                          '& .MuiListItemIcon-root': { color: group.color },
-                        },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 0, color: groupActive ? group.color : 'text.secondary', fontSize: 20 }}>
-                        {React.cloneElement(group.icon as React.ReactElement, { sx: { fontSize: 20 } })}
-                      </ListItemIcon>
-                    </ListItemButton>
-                  </Tooltip>
-                  <Divider sx={{ my: 0.5, mx: 1, opacity: 0.3 }} />
-                </List>
-              )}
-            </Box>
-          );
-        })}
+                </Tooltip>
+              </Box>
+            );
+          })}
+        </List>
       </Box>
 
       {/* Version footer */}

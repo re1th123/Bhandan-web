@@ -11,7 +11,6 @@ const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 
 // Sales
 const SalesDashboardPage = lazy(() => import('../pages/sales/SalesDashboardPage'));
-const CustomersDashboardPage = lazy(() => import('../pages/sales/CustomersDashboardPage'));
 const CustomersPage = lazy(() => import('../pages/sales/CustomersPage'));
 const SalesOrdersPage = lazy(() => import('../pages/sales/SalesOrdersPage'));
 const DeliveryChallansPage = lazy(() => import('../pages/sales/DeliveryChallansPage'));
@@ -21,7 +20,6 @@ const CreditNotesPage = lazy(() => import('../pages/sales/CreditNotesPage'));
 
 // Purchases
 const PurchaseDashboardPage = lazy(() => import('../pages/purchases/PurchaseDashboardPage'));
-const SuppliersDashboardPage = lazy(() => import('../pages/purchases/SuppliersDashboardPage'));
 const SuppliersPage = lazy(() => import('../pages/purchases/SuppliersPage'));
 const PurchaseOrdersPage = lazy(() => import('../pages/purchases/PurchaseOrdersPage'));
 const GRNPage = lazy(() => import('../pages/purchases/GRNPage'));
@@ -38,6 +36,7 @@ const WarehousesPage = lazy(() => import('../pages/inventory/WarehousesPage'));
 const StockLedgerPage = lazy(() => import('../pages/inventory/StockLedgerPage'));
 
 // Finance
+const FinanceDashboardPage = lazy(() => import('../pages/finance/FinanceDashboardPage'));
 const ChartOfAccountsPage = lazy(() => import('../pages/finance/ChartOfAccountsPage'));
 const JournalEntriesPage = lazy(() => import('../pages/finance/JournalEntriesPage'));
 const BankAccountsPage = lazy(() => import('../pages/finance/BankAccountsPage'));
@@ -46,6 +45,7 @@ const LoansDashboardPage = lazy(() => import('../pages/finance/LoansDashboardPag
 const ExpensesDashboardPage = lazy(() => import('../pages/finance/ExpensesDashboardPage'));
 
 // Reports
+const ReportsDashboardPage = lazy(() => import('../pages/reports/ReportsDashboardPage'));
 const ProfitLossPage = lazy(() => import('../pages/reports/ProfitLossPage'));
 const BalanceSheetPage = lazy(() => import('../pages/reports/BalanceSheetPage'));
 const TrialBalancePage = lazy(() => import('../pages/reports/TrialBalancePage'));
@@ -55,6 +55,7 @@ const FinanceReportsDashboardPage = lazy(() => import('../pages/reports/FinanceR
 
 // Settings
 const BusinessSettingsPage = lazy(() => import('../pages/settings/BusinessSettingsPage'));
+const SettingsDashboardPage = lazy(() => import('../pages/settings/SettingsDashboardPage'));
 const FinancialYearsPage = lazy(() => import('../pages/settings/FinancialYearsPage'));
 const UsersRolesPage = lazy(() => import('../pages/settings/UsersRolesPage'));
 
@@ -97,10 +98,9 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: renderPage(DashboardPage) },
       // Sales
-      { path: 'customers', element: <Navigate to="/sales/customers-dashboard" replace /> },
+      { path: 'customers', element: <Navigate to="/sales/dashboard" replace /> },
       { path: 'sales', element: <Navigate to="/sales/dashboard" replace /> },
       { path: 'sales/dashboard', element: renderPage(SalesDashboardPage) },
-      { path: 'sales/customers-dashboard', element: renderPage(CustomersDashboardPage) },
       { path: 'sales/customers', element: renderPage(CustomersPage) },
       { path: 'sales/orders', element: renderPage(SalesOrdersPage) },
       { path: 'sales/challans', element: renderPage(DeliveryChallansPage) },
@@ -108,10 +108,9 @@ const router = createBrowserRouter([
       { path: 'sales/payments', element: renderPage(CustomerPaymentsPage) },
       { path: 'sales/credit-notes', element: renderPage(CreditNotesPage) },
       // Purchases
-      { path: 'suppliers', element: <Navigate to="/purchases/suppliers-dashboard" replace /> },
+      { path: 'suppliers', element: <Navigate to="/purchases/dashboard" replace /> },
       { path: 'purchases', element: <Navigate to="/purchases/dashboard" replace /> },
       { path: 'purchases/dashboard', element: renderPage(PurchaseDashboardPage) },
-      { path: 'purchases/suppliers-dashboard', element: renderPage(SuppliersDashboardPage) },
       { path: 'purchases/suppliers', element: renderPage(SuppliersPage) },
       { path: 'purchases/orders', element: renderPage(PurchaseOrdersPage) },
       { path: 'purchases/grn', element: renderPage(GRNPage) },
@@ -127,8 +126,10 @@ const router = createBrowserRouter([
       { path: 'inventory/warehouses', element: renderPage(WarehousesPage) },
       { path: 'inventory/stock-ledger', element: renderPage(StockLedgerPage) },
       // Finance
-      { path: 'expenses', element: <Navigate to="/finance/expenses-dashboard" replace /> },
-      { path: 'loans', element: <Navigate to="/finance/loans-dashboard" replace /> },
+      { path: 'finance', element: <Navigate to="/finance/dashboard" replace /> },
+      { path: 'expenses', element: <Navigate to="/finance/dashboard" replace /> },
+      { path: 'loans', element: <Navigate to="/finance/dashboard" replace /> },
+      { path: 'finance/dashboard', element: renderPage(FinanceDashboardPage) },
       { path: 'finance/expenses-dashboard', element: renderPage(ExpensesDashboardPage) },
       { path: 'finance/accounts', element: renderPage(ChartOfAccountsPage) },
       { path: 'finance/journal', element: renderPage(JournalEntriesPage) },
@@ -136,8 +137,10 @@ const router = createBrowserRouter([
       { path: 'finance/opening-balances', element: renderPage(OpeningBalancesPage) },
       { path: 'finance/loans-dashboard', element: renderPage(LoansDashboardPage) },
       // Reports
-      { path: 'finance-reports', element: <Navigate to="/reports/finance-dashboard" replace /> },
-      { path: 'gst', element: <Navigate to="/reports/gst-dashboard" replace /> },
+      { path: 'reports', element: <Navigate to="/reports/dashboard" replace /> },
+      { path: 'finance-reports', element: <Navigate to="/reports/dashboard" replace /> },
+      { path: 'gst', element: <Navigate to="/reports/dashboard" replace /> },
+      { path: 'reports/dashboard', element: renderPage(ReportsDashboardPage) },
       { path: 'reports/finance-dashboard', element: renderPage(FinanceReportsDashboardPage) },
       { path: 'reports/profit-loss', element: renderPage(ProfitLossPage) },
       { path: 'reports/balance-sheet', element: renderPage(BalanceSheetPage) },
@@ -145,6 +148,8 @@ const router = createBrowserRouter([
       { path: 'reports/gst', element: renderPage(GSTReportsPage) },
       { path: 'reports/gst-dashboard', element: renderPage(GSTDashboardPage) },
       // Settings
+      { path: 'settings', element: <Navigate to="/settings/dashboard" replace /> },
+      { path: 'settings/dashboard', element: renderPage(SettingsDashboardPage) },
       { path: 'settings/business', element: renderPage(BusinessSettingsPage) },
       { path: 'settings/financial-years', element: renderPage(FinancialYearsPage) },
       { path: 'settings/users', element: renderPage(UsersRolesPage) },
