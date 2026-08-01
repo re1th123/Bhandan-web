@@ -1,8 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://wwxicktggkobdyuvgilb.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3eGlja3RnZ2tvYmR5dXZnaWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5Mzc2MzAsImV4cCI6MjEwMDUxMzYzMH0.4SvbnxCXzjwdg9auN_7hVMABCmj8-c5a8mCkZc69MHc';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in frontend/.env'
+  );
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -15,6 +20,7 @@ export type Database = {
   public: {
     Tables: {
       businesses: { Row: Business; Insert: Partial<Business>; Update: Partial<Business> };
+      business_users: { Row: BusinessUser; Insert: Partial<BusinessUser>; Update: Partial<BusinessUser> };
       customers: { Row: Customer; Insert: Partial<Customer>; Update: Partial<Customer> };
       suppliers: { Row: Supplier; Insert: Partial<Supplier>; Update: Partial<Supplier> };
       products: { Row: Product; Insert: Partial<Product>; Update: Partial<Product> };
@@ -28,6 +34,14 @@ export type Database = {
     };
   };
 };
+
+export interface BusinessUser {
+  id?: string;
+  user_id: string;
+  business_id: string;
+  role: string;
+  created_at?: string;
+}
 
 export interface Business {
   id: string;

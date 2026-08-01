@@ -4,11 +4,11 @@ import {
   InputAdornment, IconButton, Alert, CircularProgress,
   Tabs, Tab, Checkbox, FormControlLabel, LinearProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, Snackbar,
-  Stack, Divider, Chip, Paper, Grid
+  Stack, Paper, Grid
 } from '@mui/material';
 import {
   Visibility, VisibilityOff, Lock, Email, Person, Business as BusinessIcon,
-  Phone as PhoneIcon, ReceiptLong, CheckCircle, Security, ArrowForward, VpnKey
+  Phone as PhoneIcon, ReceiptLong, CheckCircle, Security, VpnKey
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
@@ -16,7 +16,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore, DEFAULT_DEMO_BUSINESS } from '../../stores/authStore';
+import { createBusinessForUser } from '../../lib/businessService';
+import { useAuthStore } from '../../stores/authStore';
 
 // ==========================================
 // ZOD VALIDATION SCHEMAS
@@ -72,8 +73,7 @@ const calculatePasswordStrength = (pass: string): { score: number; label: string
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
-  const setActiveBusiness = useAuthStore((s) => s.setActiveBusiness);
-  const setBusinesses = useAuthStore((s) => s.setBusinesses);
+  const loadUserBusinesses = useAuthStore((s) => s.loadUserBusinesses);
 
   const [tab, setTab] = useState<0 | 1>(0);
   const [showPassword, setShowPassword] = useState(false);
@@ -96,11 +96,12 @@ const LoginPage: React.FC = () => {
       interval = setInterval(() => {
         setLockoutTimer((prev) => prev - 1);
       }, 1000);
-    } else if (lockoutTimer === 0 && failedAttempts >= 5) {
+    } else if (lockoutTimer === 0) {
+      // Lockout expired — reset failed attempts so user can try again
       setFailedAttempts(0);
     }
     return () => clearInterval(interval);
-  }, [lockoutTimer, failedAttempts]);
+  }, [lockoutTimer]);
 
   // Forms
   const loginForm = useForm<LoginForm>({
@@ -128,9 +129,20 @@ const LoginPage: React.FC = () => {
   const watchPassword = registerForm.watch('password') || '';
   const passwordStrength = calculatePasswordStrength(watchPassword);
 
-  // ----------------------------------------
-  // LOGIN SUBMIT HANDLER
-  // ----------------------------------------
+  const handleAuthFailure = (message: string) => {
+    setLoading(false);
+    setFailedAttempts((prev) => {
+      const attempts = prev + 1;
+      if (attempts >= 5) {
+        setLockoutTimer(60);
+        setError('Maximum 5 failed attempts reached. Account locked for 60 seconds for security.');
+      } else {
+        setError(`${message} (${5 - attempts} attempts remaining before lockout)`);
+      }
+      return attempts;
+    });
+  };
+
   // ----------------------------------------
   // LOGIN SUBMIT HANDLER
   // ----------------------------------------
@@ -143,139 +155,43 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError('');
 
-    const inputEmail = data.email.trim().toLowerCase();
-    const inputPassword = data.password;
-
-    // 1. Check local registered users registry
-    const regUsersRaw = localStorage.getItem('bandhan_registered_users');
-    const regUsers: any[] = regUsersRaw ? JSON.parse(regUsersRaw) : [];
-    const localUser = regUsers.find((u: any) => u.email && u.email.toLowerCase() === inputEmail);
-
-    if (localUser) {
-      if (localUser.password === inputPassword) {
-        // Valid registered credentials!
-        setFailedAttempts(0);
-        setLockoutTimer(0);
-
-        setSession(
-          { access_token: `token_${Date.now()}`, expires_at: 9999999999 },
-          {
-            id: localUser.id || `u_${Date.now()}`,
-            email: localUser.email,
-            full_name: localUser.full_name,
-          }
-        );
-
-        setBusinesses([localUser.business]);
-        setActiveBusiness(localUser.business);
-        setLoading(false);
-        setSuccessMsg('Authentication successful! Redirecting to ERP Dashboard...');
-        setTimeout(() => navigate('/dashboard'), 800);
-        return;
-      } else {
-        // Password mismatch for registered user
-        setLoading(false);
-        const attempts = failedAttempts + 1;
-        setFailedAttempts(attempts);
-        if (attempts >= 5) {
-          setLockoutTimer(60);
-          setError('Maximum 5 failed attempts reached. Account locked for 60 seconds for security.');
-        } else {
-          setError(`Incorrect password for ${inputEmail}. (${5 - attempts} attempts remaining)`);
-        }
-        return;
-      }
-    }
-
-    // 2. Demo credentials check
-    if (inputEmail === 'owner@bandhanwholesale.com' || inputEmail === 'admin@bandhan.com' || inputEmail === 'demo@bandhan.com') {
-      setFailedAttempts(0);
-      setLockoutTimer(0);
-      setSession(
-        { access_token: 'demo-token', expires_at: 9999999999 },
-        { id: 'u0000000-0000-4000-8000-000000000001', email: inputEmail, full_name: 'Bandhan Admin' }
-      );
-      setActiveBusiness(DEFAULT_DEMO_BUSINESS);
-      setLoading(false);
-      setSuccessMsg('Demo authentication successful! Redirecting to ERP Dashboard...');
-      setTimeout(() => navigate('/dashboard'), 800);
-      return;
-    }
-
-    // 3. Fallback to Supabase Cloud Auth
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: data.email,
+        email: data.email.trim(),
         password: data.password,
       });
 
       if (authError) {
-        setLoading(false);
-        const attempts = failedAttempts + 1;
-        setFailedAttempts(attempts);
-
-        if (attempts >= 5) {
-          setLockoutTimer(60);
-          setError('Maximum 5 failed attempts reached. Account locked for 60 seconds for security.');
-        } else {
-          setError(`${authError.message}. (${5 - attempts} attempts remaining before lockout)`);
-        }
+        const friendlyMsg = authError.message === 'Invalid login credentials'
+          ? 'No account found with these credentials. Please register first or check your email and password.'
+          : authError.message;
+        handleAuthFailure(friendlyMsg);
         return;
       }
 
-      if (authData.session && authData.user) {
-        setFailedAttempts(0);
-        setLockoutTimer(0);
-        const userObj = {
-          id: authData.user.id,
-          email: authData.user.email ?? '',
-          full_name: authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0],
-        };
-        setSession(authData.session, userObj);
-
-        // Fetch or assign real business for authenticated user
-        const userBusiness = {
-          id: 'b_' + authData.user.id.slice(0, 8),
-          name: authData.user.user_metadata?.business_name || `${userObj.full_name}'s Enterprise`,
-          gstin: authData.user.user_metadata?.gstin || '',
-          phone: authData.user.user_metadata?.phone || '',
-          address: 'Registered Premises',
-          fy_start_month: 4,
-          default_currency: 'INR',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setBusinesses([userBusiness]);
-        setActiveBusiness(userBusiness);
-
-        setLoading(false);
-        setSuccessMsg('Authentication successful! Redirecting to ERP Dashboard...');
-        setTimeout(() => navigate('/dashboard'), 800);
+      if (!authData.session || !authData.user) {
+        handleAuthFailure('Sign-in succeeded but no session was returned. Confirm your email if required.');
+        return;
       }
+
+      setFailedAttempts(0);
+      setLockoutTimer(0);
+
+      const userObj = {
+        id: authData.user.id,
+        email: authData.user.email ?? '',
+        full_name: authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0],
+      };
+      setSession(authData.session, userObj);
+      await loadUserBusinesses(authData.user.id);
+
+      setLoading(false);
+      setSuccessMsg('Authentication successful! Redirecting to ERP Dashboard...');
+      setTimeout(() => navigate('/dashboard'), 800);
     } catch (err: any) {
       setLoading(false);
       setError(err.message || 'Authentication service unreachable.');
     }
-  };
-
-  // ----------------------------------------
-  // QUICK DEMO LOGIN HANDLER
-  // ----------------------------------------
-  const handleQuickDemoLogin = () => {
-    setLoading(true);
-    setError('');
-    setFailedAttempts(0);
-    setLockoutTimer(0);
-    setTimeout(() => {
-      setSession(
-        { access_token: 'demo-token', expires_at: 9999999999 },
-        { id: 'u0000000-0000-4000-8000-000000000001', email: 'owner@bandhanwholesale.com', full_name: 'Bandhan Admin' }
-      );
-      setActiveBusiness(DEFAULT_DEMO_BUSINESS);
-      setLoading(false);
-      navigate('/dashboard');
-    }, 600);
   };
 
   // ----------------------------------------
@@ -286,77 +202,58 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      // 1. Create Business Record object
-      const newBusiness = {
-        id: 'b_' + Date.now().toString().slice(-8),
-        name: data.business_name,
-        gstin: data.gstin || '',
-        phone: data.phone,
-        email: data.email,
-        address: 'Registered Business Premises',
-        fy_start_month: 4,
-        default_currency: 'INR',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email.trim(),
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.full_name,
+            business_name: data.business_name,
+            phone: data.phone,
+            gstin: data.gstin || '',
+          },
+        },
+      });
 
-      // 2. Register User in Supabase Auth
-      let authUser: any = null;
-      let authSession: any = null;
+      if (authError) {
+        setLoading(false);
+        setError(authError.message);
+        return;
+      }
+
+      if (!authData.user) {
+        setLoading(false);
+        setError('Registration failed. No user account was created.');
+        return;
+      }
+
+      if (!authData.session) {
+        setLoading(false);
+        setSuccessMsg(
+          `Account for ${data.email} created! Please check your email inbox to confirm your address, then sign in.`
+        );
+        setTab(0);
+        return;
+      }
+
+      const userObj = {
+        id: authData.user.id,
+        email: authData.user.email ?? data.email,
+        full_name: data.full_name,
+      };
+      setSession(authData.session, userObj);
 
       try {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        await createBusinessForUser(authData.user.id, {
+          business_name: data.business_name,
+          phone: data.phone,
+          gstin: data.gstin || undefined,
           email: data.email,
-          password: data.password,
-          options: {
-            data: {
-              full_name: data.full_name,
-              business_name: data.business_name,
-              phone: data.phone,
-              gstin: data.gstin,
-            },
-          },
         });
-        if (!authError && authData) {
-          authUser = authData.user;
-          authSession = authData.session;
-        }
-      } catch (e) {
-        console.warn('Cloud signUp skipped, registering user locally:', e);
+      } catch (bizErr: any) {
+        console.warn('Business creation notice:', bizErr?.message);
       }
-
-      // 3. Save User & Business to Local Registered Users Store
-      const regUsersRaw = localStorage.getItem('bandhan_registered_users');
-      const regUsers: any[] = regUsersRaw ? JSON.parse(regUsersRaw) : [];
-      const userRecord = {
-        id: authUser?.id || 'u_' + Date.now(),
-        email: data.email.trim().toLowerCase(),
-        password: data.password,
-        full_name: data.full_name,
-        business: newBusiness,
-      };
-
-      // Replace existing or add new
-      const existingIdx = regUsers.findIndex((u: any) => u.email === userRecord.email);
-      if (existingIdx >= 0) {
-        regUsers[existingIdx] = userRecord;
-      } else {
-        regUsers.push(userRecord);
-      }
-      localStorage.setItem('bandhan_registered_users', JSON.stringify(regUsers));
-
-      // 4. Set Active Session & Business
-      setSession(
-        authSession || { access_token: `token_${Date.now()}`, expires_at: 9999999999 },
-        {
-          id: userRecord.id,
-          email: data.email,
-          full_name: data.full_name,
-        }
-      );
-      setBusinesses([newBusiness]);
-      setActiveBusiness(newBusiness);
+      await loadUserBusinesses(authData.user.id);
 
       setFailedAttempts(0);
       setLockoutTimer(0);
@@ -657,27 +554,6 @@ const LoginPage: React.FC = () => {
                       {loading ? <CircularProgress size={26} color="inherit" /> : 'Sign In to Bandhan ERP'}
                     </Button>
 
-                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)', my: 1 }}>
-                      <Chip label="OR" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }} />
-                    </Divider>
-
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      onClick={handleQuickDemoLogin}
-                      disabled={loading}
-                      endIcon={<ArrowForward />}
-                      sx={{
-                        py: 1.4,
-                        borderRadius: 2.5,
-                        color: '#7986CB',
-                        borderColor: 'rgba(121,134,203,0.4)',
-                        fontWeight: 600,
-                        '&:hover': { borderColor: '#7986CB', bgcolor: 'rgba(121,134,203,0.1)' },
-                      }}
-                    >
-                      Quick Demo Login (Bypass Auth)
-                    </Button>
                   </Stack>
                 </form>
               )}

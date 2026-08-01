@@ -23,10 +23,11 @@ const AppShell: React.FC = () => {
   const navigate = useNavigate();
 
   const { sidebarCollapsed, setSidebarCollapsed, themeMode, toggleTheme } = useUIStore();
-  const { user, activeBusiness, logout } = useAuthStore();
+  const { user, activeBusiness, businesses, setActiveBusiness, logout } = useAuthStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [bizAnchor, setBizAnchor] = useState<null | HTMLElement>(null);
   const [notifAnchor, setNotifAnchor] = useState<null | HTMLElement>(null);
 
   const drawerWidth = isMobile ? DRAWER_WIDTH : sidebarCollapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
@@ -68,28 +69,99 @@ const AppShell: React.FC = () => {
             }
           </IconButton>
 
-          {/* Business name */}
-          {activeBusiness && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
-              <Box
-                sx={{
-                  width: 32, height: 32, borderRadius: 2,
-                  background: 'linear-gradient(135deg, #5C6BC0, #3949AB)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Business sx={{ color: 'white', fontSize: 18 }} />
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" fontWeight={700} lineHeight={1.2}>
-                  {activeBusiness.name}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" lineHeight={1}>
-                  {activeBusiness.gstin || 'ERP System'}
-                </Typography>
-              </Box>
+          {/* Business Switcher */}
+          <Box
+            onClick={(e) => setBizAnchor(e.currentTarget)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              ml: 1,
+              cursor: 'pointer',
+              px: 1.5,
+              py: 0.75,
+              borderRadius: 2.5,
+              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+              transition: 'background 0.2s',
+            }}
+          >
+            <Box
+              sx={{
+                width: 32, height: 32, borderRadius: 2,
+                background: 'linear-gradient(135deg, #5C6BC0, #3949AB)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Business sx={{ color: 'white', fontSize: 18 }} />
             </Box>
-          )}
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} lineHeight={1.2}>
+                {activeBusiness?.name || 'Select Business'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                {activeBusiness?.gstin || (businesses.length > 1 ? `${businesses.length} Businesses Available` : 'ERP System')}
+              </Typography>
+            </Box>
+            <KeyboardArrowDown sx={{ color: 'text.secondary', fontSize: 18 }} />
+          </Box>
+
+          <Menu
+            anchorEl={bizAnchor}
+            open={Boolean(bizAnchor)}
+            onClose={() => setBizAnchor(null)}
+            PaperProps={{ sx: { minWidth: 240, borderRadius: 3, mt: 1 } }}
+          >
+            <Box px={2} py={1}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                MY REGISTERED BUSINESSES ({businesses.length})
+              </Typography>
+            </Box>
+            <Divider />
+            {businesses.length === 0 ? (
+              <MenuItem disabled sx={{ py: 1.5 }}>
+                <Typography variant="body2" color="text.secondary">No business linked</Typography>
+              </MenuItem>
+            ) : (
+              businesses.map((b) => (
+                <MenuItem
+                  key={b.id}
+                  selected={b.id === activeBusiness?.id}
+                  onClick={() => {
+                    setActiveBusiness(b);
+                    setBizAnchor(null);
+                  }}
+                  sx={{ py: 1.2, gap: 1.5 }}
+                >
+                  <Box
+                    sx={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      bgcolor: b.id === activeBusiness?.id ? 'primary.main' : 'transparent',
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="body2" fontWeight={b.id === activeBusiness?.id ? 700 : 500}>
+                      {b.name}
+                    </Typography>
+                    {b.gstin && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        GSTIN: {b.gstin}
+                      </Typography>
+                    )}
+                  </Box>
+                </MenuItem>
+              ))
+            )}
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                setBizAnchor(null);
+                navigate('/settings/dashboard');
+              }}
+              sx={{ color: 'primary.main', fontWeight: 600, py: 1.2 }}
+            >
+              + Register / Manage Businesses
+            </MenuItem>
+          </Menu>
 
           <Box sx={{ flex: 1 }} />
 

@@ -14,6 +14,13 @@ import {
   useTheme,
   alpha,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Alert,
+  Stack,
 } from '@mui/material';
 import {
   Settings,
@@ -25,11 +32,13 @@ import {
   AlertTriangle,
   FileText,
   Globe,
+  Plus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
 
 import { useAuthStore } from '../../stores/authStore';
+import { createBusinessForUser } from '../../lib/businessService';
 
 const MotionCard = motion.create(Card);
 
@@ -52,12 +61,43 @@ const TABS = [
 const SettingsDashboardPage: React.FC = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const activeBusiness = useAuthStore((s) => s.activeBusiness);
+  const { user, activeBusiness, businesses, setActiveBusiness, loadUserBusinesses } = useAuthStore();
   const [activeTab, setActiveTab] = useState(0);
 
-  const isDemo = !activeBusiness?.id || activeBusiness.id === 'a0000000-0000-4000-8000-000000000001';
+  // New Business Dialog State
+  const [openNewBiz, setOpenNewBiz] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [gstinInput, setGstinInput] = useState('');
+  const [loadingNewBiz, setLoadingNewBiz] = useState(false);
+  const [newBizError, setNewBizError] = useState('');
 
-  const gridColor = isDark ? alpha('#fff', 0.06) : alpha('#000', 0.06);
+  const handleRegisterNewBiz = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id || !nameInput.trim()) return;
+    setLoadingNewBiz(true);
+    setNewBizError('');
+    try {
+      const b = await createBusinessForUser(user.id, {
+        business_name: nameInput.trim(),
+        phone: phoneInput.trim(),
+        gstin: gstinInput.trim() || undefined,
+        email: user.email,
+      });
+      await loadUserBusinesses(user.id);
+      setActiveBusiness(b);
+      setOpenNewBiz(false);
+      setNameInput('');
+      setPhoneInput('');
+      setGstinInput('');
+    } catch (err: any) {
+      setNewBizError(err.message || 'Failed to register business');
+    } finally {
+      setLoadingNewBiz(false);
+    }
+  };
+
+  const gridColor = isDark ? alpha('#fff', 0.06) : alpha('#000', 0.02);
 
   const renderOverview = () => (
     <Box>
@@ -84,19 +124,19 @@ const SettingsDashboardPage: React.FC = () => {
                 </Avatar>
                 <Box flex={1}>
                   <Typography variant="h5" fontWeight={800}>
-                    {activeBusiness?.name || (isDemo ? 'Bandhan Wholesale Ltd' : 'My Registered Enterprise')}
+                    {activeBusiness?.name || 'My Business'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" mb={0.5}>
-                    {activeBusiness?.address || (isDemo ? 'Plot 42, Industrial Wholesale Market, Mumbai, MH' : 'Registered Business Address')}
+                    {activeBusiness?.address || 'Business Address'}
                   </Typography>
                   <Box display="flex" gap={1} flexWrap="wrap">
                     <Chip
-                      label={`GSTIN: ${activeBusiness?.gstin || (isDemo ? '27AABCB1234D1ZB' : 'Not Registered')}`}
+                      label={`GSTIN: ${activeBusiness?.gstin || 'Not Registered'}`}
                       size="small"
                       sx={{ fontWeight: 600, fontSize: '0.7rem' }}
                     />
                     <Chip
-                      label={`PAN: ${activeBusiness?.pan || (isDemo ? 'AABCB1234D' : 'Not Provided')}`}
+                      label={`PAN: ${activeBusiness?.pan || 'Not Provided'}`}
                       size="small"
                       sx={{ fontWeight: 600, fontSize: '0.7rem' }}
                     />
@@ -117,7 +157,7 @@ const SettingsDashboardPage: React.FC = () => {
 
               <Grid container spacing={2}>
                 {[
-                  { label: 'Phone', value: activeBusiness?.phone || (isDemo ? '+91 98765 43210' : 'Not Provided'), icon: <Globe size={16} /> },
+                  { label: 'Phone', value: activeBusiness?.phone || 'Not Provided', icon: <Globe size={16} /> },
                   { label: 'Currency', value: activeBusiness?.default_currency || 'INR', icon: <FileText size={16} /> },
                   { label: 'FY Start Month', value: `Month ${activeBusiness?.fy_start_month || 4} (April)`, icon: <Calendar size={16} /> },
                   { label: 'Status', value: activeBusiness?.is_active ? 'Active' : 'Inactive', icon: <CheckCircle2 size={16} /> },
@@ -190,6 +230,106 @@ const SettingsDashboardPage: React.FC = () => {
           </MotionCard>
         </Grid>
       </Grid>
+
+      {/* Registered Businesses List */}
+      <MotionCard
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.15 }}
+        sx={{ mb: 3 }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>
+                Registered Businesses ({businesses.length})
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Switch active business or register additional wholesale enterprises linked to your account
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<Plus size={18} />}
+              onClick={() => setOpenNewBiz(true)}
+              sx={{
+                background: 'linear-gradient(135deg, #5C6BC0, #3949AB)',
+                fontWeight: 700,
+                borderRadius: 2,
+              }}
+            >
+              Register Additional Business
+            </Button>
+          </Box>
+
+          <Grid container spacing={2}>
+            {businesses.map((b) => {
+              const isActive = b.id === activeBusiness?.id;
+              return (
+                <Grid item xs={12} sm={6} md={4} key={b.id}>
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 3,
+                      border: `1.5px solid ${isActive ? theme.palette.primary.main : alpha(theme.palette.divider, 0.5)}`,
+                      bgcolor: isActive ? alpha(theme.palette.primary.main, 0.04) : 'background.paper',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
+                      <Box display="flex" alignItems="center" gap={1.5}>
+                        <Avatar
+                          sx={{
+                            width: 40, height: 40,
+                            bgcolor: isActive ? 'primary.main' : alpha(theme.palette.text.secondary, 0.15),
+                            color: isActive ? 'white' : 'text.primary',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {b.name?.charAt(0) || 'B'}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight={700}>
+                            {b.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {b.gstin ? `GSTIN: ${b.gstin}` : 'Unregistered GST'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      {isActive && (
+                        <Chip
+                          icon={<CheckCircle2 size={12} />}
+                          label="Active"
+                          size="small"
+                          color="primary"
+                          sx={{ fontWeight: 700, fontSize: '0.65rem' }}
+                        />
+                      )}
+                    </Box>
+
+                    <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+                      Phone: {b.phone || 'N/A'} • Currency: {b.default_currency || 'INR'}
+                    </Typography>
+
+                    {!isActive && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        fullWidth
+                        onClick={() => setActiveBusiness(b)}
+                        sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none' }}
+                      >
+                        Switch to Active
+                      </Button>
+                    )}
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </CardContent>
+      </MotionCard>
 
       {/* Quick Access Cards */}
       <Grid container spacing={2.5} mb={3}>
@@ -414,11 +554,71 @@ const SettingsDashboardPage: React.FC = () => {
           <FinancialYearsPage />
         </Suspense>
       )}
-      {activeTab === 2 && (
-        <Suspense fallback={<TabLoader />}>
-          <UsersRolesPage />
-        </Suspense>
-      )}
+      {/* Register Business Dialog */}
+      <Dialog
+        open={openNewBiz}
+        onClose={() => setOpenNewBiz(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <form onSubmit={handleRegisterNewBiz}>
+          <DialogTitle sx={{ fontWeight: 700 }}>Register Additional Business</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              Create and link another business enterprise under your account. You can switch between active businesses at any time.
+            </Typography>
+
+            {newBizError && (
+              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                {newBizError}
+              </Alert>
+            )}
+
+            <Stack spacing={2.5}>
+              <TextField
+                label="Business Name"
+                required
+                fullWidth
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="e.g. Bandhan Logistics Pvt Ltd"
+              />
+              <TextField
+                label="Phone Number"
+                fullWidth
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder="e.g. +91 98765 43210"
+              />
+              <TextField
+                label="GSTIN (Optional)"
+                fullWidth
+                value={gstinInput}
+                onChange={(e) => setGstinInput(e.target.value)}
+                placeholder="e.g. 27AAACB1234D1ZB"
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setOpenNewBiz(false)} color="inherit">
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loadingNewBiz || !nameInput.trim()}
+              sx={{
+                background: 'linear-gradient(135deg, #5C6BC0, #3949AB)',
+                fontWeight: 700,
+                px: 3,
+              }}
+            >
+              {loadingNewBiz ? <CircularProgress size={22} color="inherit" /> : 'Register Business'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
     </Box>
   );
 };

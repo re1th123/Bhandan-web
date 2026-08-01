@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
+import { ensureUserBusiness, fetchUserBusinesses } from '../lib/businessService';
 import type { Business } from '../lib/supabase';
 
 interface AuthUser {
@@ -8,21 +9,6 @@ interface AuthUser {
   email: string;
   full_name?: string;
 }
-
-export const DEFAULT_DEMO_BUSINESS: Business = {
-  id: 'a0000000-0000-4000-8000-000000000001',
-  name: 'Bandhan Wholesale Ltd',
-  gstin: '27AABCB1234D1ZB',
-  pan: 'AABCB1234D',
-  address: 'Plot 42, Industrial Wholesale Market, Sector 18, Mumbai, MH',
-  phone: '+91 98765 43210',
-  logo_url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=150&q=80',
-  fy_start_month: 4,
-  default_currency: 'INR',
-  is_active: true,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-};
 
 interface AuthState {
   user: AuthUser | null;
@@ -35,34 +21,84 @@ interface AuthState {
   setSession: (session: any, user: AuthUser) => void;
   setActiveBusiness: (business: Business) => void;
   setBusinesses: (businesses: Business[]) => void;
+  loadUserBusinesses: (userId: string) => Promise<Business[]>;
   logout: () => Promise<void>;
   initialize: () => Promise<void>;
 }
 
+function toAuthUser(user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> }): AuthUser {
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    full_name: user.user_metadata?.full_name as string | undefined,
+  };
+}
+
+
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      user: {
-        id: 'u0000000-0000-4000-8000-000000000001',
-        email: 'owner@bandhanwholesale.com',
-        full_name: 'Bandhan Admin',
-      },
+      user: null,
       session: null,
-      activeBusiness: DEFAULT_DEMO_BUSINESS,
-      businesses: [DEFAULT_DEMO_BUSINESS],
+      activeBusiness: null,
+      businesses: [],
       isLoading: false,
-      isAuthenticated: true,
+      isAuthenticated: false,
 
       setSession: (session, user) =>
-        set({ session, user, isAuthenticated: !!session, isLoading: false }),
+        set({ session, user, isAuthenticated: !!session && !!user, isLoading: false }),
 
-      setActiveBusiness: (business) =>
-        set({ activeBusiness: business }),
+      setActiveBusiness: (business) => set({ activeBusiness: business }),
 
       setBusinesses: (businesses) => {
         const current = get().activeBusiness;
-        const active = current ? businesses.find((b) => b.id === current.id) : businesses[0];
-        set({ businesses, activeBusiness: active || DEFAULT_DEMO_BUSINESS });
+        const active = current
+          ? businesses.find((b) => b.id === current.id) ?? businesses[0] ?? null
+          : businesses[0] ?? null;
+        set({ businesses, activeBusiness: active });
+      },
+
+      loadUserBusinesses: async (userId) => {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData.session?.user;
+
+        let businesses: Business[] = [];
+        try {
+          businesses = await fetchUserBusinesses(userId);
+        } catch (err) {
+          console.warn('fetchUserBusinesses query note:', err);
+        }
+
+        if (businesses.length === 0 && user) {
+          businesses = await ensureUserBusiness(user);
+        }
+
+        // Fail-safe: ensure user ALWAYS has their business listed from auth metadata
+        if (businesses.length === 0 && user) {
+          const meta = user.user_metadata ?? {};
+          const fallbackName =
+            (meta.business_name as string) ||
+            (meta.full_name ? `${meta.full_name}'s Enterprise` : undefined) ||
+            (user.email ? `${user.email.split('@')[0]}'s Wholesale` : 'My Enterprise');
+
+          businesses = [
+            {
+              id: `biz-${user.id.slice(0, 8)}`,
+              name: fallbackName,
+              phone: (meta.phone as string) || undefined,
+              gstin: (meta.gstin as string) || undefined,
+              fy_start_month: 4,
+              default_currency: 'INR',
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ];
+        }
+
+        get().setBusinesses(businesses);
+        return businesses;
       },
 
       logout: async () => {
@@ -71,49 +107,53 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           session: null,
           isAuthenticated: false,
-          activeBusiness: DEFAULT_DEMO_BUSINESS,
-          businesses: [DEFAULT_DEMO_BUSINESS],
+          activeBusiness: null,
+          businesses: [],
         });
       },
 
       initialize: async () => {
         set({ isLoading: true });
+
         const { data } = await supabase.auth.getSession();
+
         if (data.session?.user) {
+          const authUser = toAuthUser(data.session.user);
           set({
             session: data.session,
-            user: {
-              id: data.session.user.id,
-              email: data.session.user.email ?? '',
-              full_name: data.session.user.user_metadata?.full_name,
-            },
+            user: authUser,
             isAuthenticated: true,
           });
 
-          // Attempt to fetch user's registered businesses from Supabase
           try {
-            const { data: bData } = await supabase
-              .from('businesses')
-              .select('*');
-            if (bData && bData.length > 0) {
-              set({ businesses: bData, activeBusiness: bData[0] });
-            }
+            await get().loadUserBusinesses(authUser.id);
           } catch (e) {
-            console.warn('Could not fetch cloud businesses, using default demo business.', e);
+            console.error('Failed to load user businesses:', e);
           }
         }
+
         set({ isLoading: false });
 
-        supabase.auth.onAuthStateChange((_event, session) => {
+        supabase.auth.onAuthStateChange(async (_event, session) => {
           if (session?.user) {
+            const authUser = toAuthUser(session.user);
             set({
               session,
-              user: {
-                id: session.user.id,
-                email: session.user.email ?? '',
-                full_name: session.user.user_metadata?.full_name,
-              },
+              user: authUser,
               isAuthenticated: true,
+            });
+            try {
+              await get().loadUserBusinesses(authUser.id);
+            } catch (e) {
+              console.error('Failed to load user businesses on auth change:', e);
+            }
+          } else {
+            set({
+              session: null,
+              user: null,
+              isAuthenticated: false,
+              activeBusiness: null,
+              businesses: [],
             });
           }
         });
