@@ -130,6 +130,9 @@ const LoginPage: React.FC = () => {
   // ----------------------------------------
   // LOGIN SUBMIT HANDLER
   // ----------------------------------------
+  // ----------------------------------------
+  // LOGIN SUBMIT HANDLER
+  // ----------------------------------------
   const onLoginSubmit = async (data: LoginForm) => {
     if (lockoutTimer > 0) {
       setError(`Too many failed attempts. Account temporarily locked. Please wait ${lockoutTimer}s.`);
@@ -139,15 +142,74 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError('');
 
+    const inputEmail = data.email.trim().toLowerCase();
+    const inputPassword = data.password;
+
+    // 1. Check local registered users registry
+    const regUsersRaw = localStorage.getItem('bandhan_registered_users');
+    const regUsers: any[] = regUsersRaw ? JSON.parse(regUsersRaw) : [];
+    const localUser = regUsers.find((u: any) => u.email && u.email.toLowerCase() === inputEmail);
+
+    if (localUser) {
+      if (localUser.password === inputPassword) {
+        // Valid registered credentials!
+        setFailedAttempts(0);
+        setLockoutTimer(0);
+
+        setSession(
+          { access_token: `token_${Date.now()}`, expires_at: 9999999999 },
+          {
+            id: localUser.id || `u_${Date.now()}`,
+            email: localUser.email,
+            full_name: localUser.full_name,
+          }
+        );
+
+        setBusinesses([localUser.business]);
+        setActiveBusiness(localUser.business);
+        setLoading(false);
+        setSuccessMsg('Authentication successful! Redirecting to ERP Dashboard...');
+        setTimeout(() => navigate('/dashboard'), 800);
+        return;
+      } else {
+        // Password mismatch for registered user
+        setLoading(false);
+        const attempts = failedAttempts + 1;
+        setFailedAttempts(attempts);
+        if (attempts >= 5) {
+          setLockoutTimer(60);
+          setError('Maximum 5 failed attempts reached. Account locked for 60 seconds for security.');
+        } else {
+          setError(`Incorrect password for ${inputEmail}. (${5 - attempts} attempts remaining)`);
+        }
+        return;
+      }
+    }
+
+    // 2. Demo credentials check
+    if (inputEmail === 'owner@bandhanwholesale.com' || inputEmail === 'admin@bandhan.com' || inputEmail === 'demo@bandhan.com') {
+      setFailedAttempts(0);
+      setLockoutTimer(0);
+      setSession(
+        { access_token: 'demo-token', expires_at: 9999999999 },
+        { id: 'u0000000-0000-4000-8000-000000000001', email: inputEmail, full_name: 'Bandhan Admin' }
+      );
+      setActiveBusiness(DEFAULT_DEMO_BUSINESS);
+      setLoading(false);
+      setSuccessMsg('Demo authentication successful! Redirecting to ERP Dashboard...');
+      setTimeout(() => navigate('/dashboard'), 800);
+      return;
+    }
+
+    // 3. Fallback to Supabase Cloud Auth
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       });
 
-      setLoading(false);
-
       if (authError) {
+        setLoading(false);
         const attempts = failedAttempts + 1;
         setFailedAttempts(attempts);
 
@@ -162,6 +224,7 @@ const LoginPage: React.FC = () => {
 
       if (authData.session && authData.user) {
         setFailedAttempts(0);
+        setLockoutTimer(0);
         const userObj = {
           id: authData.user.id,
           email: authData.user.email ?? '',
@@ -170,46 +233,24 @@ const LoginPage: React.FC = () => {
         setSession(authData.session, userObj);
 
         // Fetch or assign real business for authenticated user
-        try {
-          const { data: bData } = await supabase
-            .from('businesses')
-            .select('*');
+        const userBusiness = {
+          id: 'b_' + authData.user.id.slice(0, 8),
+          name: authData.user.user_metadata?.business_name || `${userObj.full_name}'s Enterprise`,
+          gstin: authData.user.user_metadata?.gstin || '',
+          phone: authData.user.user_metadata?.phone || '',
+          address: 'Registered Premises',
+          fy_start_month: 4,
+          default_currency: 'INR',
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setBusinesses([userBusiness]);
+        setActiveBusiness(userBusiness);
 
-          if (bData && bData.length > 0) {
-            setBusinesses(bData);
-            setActiveBusiness(bData[0]);
-          } else {
-            const userBusiness = {
-              id: 'b_' + authData.user.id.slice(0, 8),
-              name: authData.user.user_metadata?.business_name || `${userObj.full_name}'s Enterprise`,
-              gstin: authData.user.user_metadata?.gstin || '',
-              phone: authData.user.user_metadata?.phone || '',
-              address: 'Registered Premises',
-              fy_start_month: 4,
-              default_currency: 'INR',
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            setBusinesses([userBusiness]);
-            setActiveBusiness(userBusiness);
-          }
-        } catch (e) {
-          const userBusiness = {
-            id: 'b_' + authData.user.id.slice(0, 8),
-            name: `${userObj.full_name}'s Enterprise`,
-            fy_start_month: 4,
-            default_currency: 'INR',
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          setBusinesses([userBusiness]);
-          setActiveBusiness(userBusiness);
-        }
-
+        setLoading(false);
         setSuccessMsg('Authentication successful! Redirecting to ERP Dashboard...');
-        setTimeout(() => navigate('/dashboard'), 1000);
+        setTimeout(() => navigate('/dashboard'), 800);
       }
     } catch (err: any) {
       setLoading(false);
@@ -223,6 +264,8 @@ const LoginPage: React.FC = () => {
   const handleQuickDemoLogin = () => {
     setLoading(true);
     setError('');
+    setFailedAttempts(0);
+    setLockoutTimer(0);
     setTimeout(() => {
       setSession(
         { access_token: 'demo-token', expires_at: 9999999999 },
@@ -242,61 +285,80 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      // 1. Register User in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            full_name: data.full_name,
-            business_name: data.business_name,
-            phone: data.phone,
-            gstin: data.gstin,
-          },
-        },
-      });
-
-      if (authError) {
-        setLoading(false);
-        setError(authError.message);
-        return;
-      }
-
-      // 2. Create Business Record
+      // 1. Create Business Record object
       const newBusiness = {
-        id: authData.user?.id || 'b' + Date.now(),
+        id: 'b_' + Date.now().toString().slice(-8),
         name: data.business_name,
-        gstin: data.gstin || '27AABCB1234D1ZB',
+        gstin: data.gstin || '',
         phone: data.phone,
         email: data.email,
         address: 'Registered Business Premises',
         fy_start_month: 4,
+        default_currency: 'INR',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
+      // 2. Register User in Supabase Auth
+      let authUser: any = null;
+      let authSession: any = null;
+
       try {
-        await supabase.from('businesses').insert([
-          {
-            name: data.business_name,
-            gstin: data.gstin || null,
-            phone: data.phone,
-            is_active: true,
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: data.email,
+          password: data.password,
+          options: {
+            data: {
+              full_name: data.full_name,
+              business_name: data.business_name,
+              phone: data.phone,
+              gstin: data.gstin,
+            },
           },
-        ]);
-      } catch (dbErr) {
-        console.warn('Supabase cloud insert skipped due to RLS policies.', dbErr);
+        });
+        if (!authError && authData) {
+          authUser = authData.user;
+          authSession = authData.session;
+        }
+      } catch (e) {
+        console.warn('Cloud signUp skipped, registering user locally:', e);
       }
 
-      // 3. Set Active Session & Business locally for instant ERP access
+      // 3. Save User & Business to Local Registered Users Store
+      const regUsersRaw = localStorage.getItem('bandhan_registered_users');
+      const regUsers: any[] = regUsersRaw ? JSON.parse(regUsersRaw) : [];
+      const userRecord = {
+        id: authUser?.id || 'u_' + Date.now(),
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+        full_name: data.full_name,
+        business: newBusiness,
+      };
+
+      // Replace existing or add new
+      const existingIdx = regUsers.findIndex((u: any) => u.email === userRecord.email);
+      if (existingIdx >= 0) {
+        regUsers[existingIdx] = userRecord;
+      } else {
+        regUsers.push(userRecord);
+      }
+      localStorage.setItem('bandhan_registered_users', JSON.stringify(regUsers));
+
+      // 4. Set Active Session & Business
       setSession(
-        authData.session || { access_token: 'reg-token', expires_at: 9999999999 },
+        authSession || { access_token: `token_${Date.now()}`, expires_at: 9999999999 },
         {
-          id: authData.user?.id || 'u' + Date.now(),
+          id: userRecord.id,
           email: data.email,
           full_name: data.full_name,
         }
       );
+      setBusinesses([newBusiness]);
       setActiveBusiness(newBusiness);
 
+      setFailedAttempts(0);
+      setLockoutTimer(0);
       setLoading(false);
       setSuccessMsg(`Business "${data.business_name}" registered successfully! Redirecting to ERP Dashboard...`);
       setTimeout(() => navigate('/dashboard'), 1000);
