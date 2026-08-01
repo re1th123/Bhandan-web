@@ -55,6 +55,8 @@ const SettingsDashboardPage: React.FC = () => {
   const activeBusiness = useAuthStore((s) => s.activeBusiness);
   const [activeTab, setActiveTab] = useState(0);
 
+  const isDemo = !activeBusiness?.id || activeBusiness.id === 'a0000000-0000-4000-8000-000000000001';
+
   const gridColor = isDark ? alpha('#fff', 0.06) : alpha('#000', 0.06);
 
   const renderOverview = () => (
@@ -82,19 +84,19 @@ const SettingsDashboardPage: React.FC = () => {
                 </Avatar>
                 <Box flex={1}>
                   <Typography variant="h5" fontWeight={800}>
-                    {activeBusiness?.name || 'Bandhan Wholesale Ltd'}
+                    {activeBusiness?.name || (isDemo ? 'Bandhan Wholesale Ltd' : 'My Registered Enterprise')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" mb={0.5}>
-                    {activeBusiness?.address || 'Plot 42, Industrial Wholesale Market, Mumbai, MH'}
+                    {activeBusiness?.address || (isDemo ? 'Plot 42, Industrial Wholesale Market, Mumbai, MH' : 'Registered Business Address')}
                   </Typography>
                   <Box display="flex" gap={1} flexWrap="wrap">
                     <Chip
-                      label={`GSTIN: ${activeBusiness?.gstin || '27AABCB1234D1ZB'}`}
+                      label={`GSTIN: ${activeBusiness?.gstin || (isDemo ? '27AABCB1234D1ZB' : 'Not Registered')}`}
                       size="small"
                       sx={{ fontWeight: 600, fontSize: '0.7rem' }}
                     />
                     <Chip
-                      label={`PAN: ${activeBusiness?.pan || 'AABCB1234D'}`}
+                      label={`PAN: ${activeBusiness?.pan || (isDemo ? 'AABCB1234D' : 'Not Provided')}`}
                       size="small"
                       sx={{ fontWeight: 600, fontSize: '0.7rem' }}
                     />
@@ -115,7 +117,7 @@ const SettingsDashboardPage: React.FC = () => {
 
               <Grid container spacing={2}>
                 {[
-                  { label: 'Phone', value: activeBusiness?.phone || '+91 98765 43210', icon: <Globe size={16} /> },
+                  { label: 'Phone', value: activeBusiness?.phone || (isDemo ? '+91 98765 43210' : 'Not Provided'), icon: <Globe size={16} /> },
                   { label: 'Currency', value: activeBusiness?.default_currency || 'INR', icon: <FileText size={16} /> },
                   { label: 'FY Start Month', value: `Month ${activeBusiness?.fy_start_month || 4} (April)`, icon: <Calendar size={16} /> },
                   { label: 'Status', value: activeBusiness?.is_active ? 'Active' : 'Inactive', icon: <CheckCircle2 size={16} /> },

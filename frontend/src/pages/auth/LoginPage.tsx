@@ -162,14 +162,52 @@ const LoginPage: React.FC = () => {
 
       if (authData.session && authData.user) {
         setFailedAttempts(0);
-        setSession(authData.session, {
+        const userObj = {
           id: authData.user.id,
           email: authData.user.email ?? '',
-          full_name: authData.user.user_metadata?.full_name,
-        });
+          full_name: authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0],
+        };
+        setSession(authData.session, userObj);
 
-        // Set active business
-        setActiveBusiness(DEFAULT_DEMO_BUSINESS);
+        // Fetch or assign real business for authenticated user
+        try {
+          const { data: bData } = await supabase
+            .from('businesses')
+            .select('*');
+
+          if (bData && bData.length > 0) {
+            setBusinesses(bData);
+            setActiveBusiness(bData[0]);
+          } else {
+            const userBusiness = {
+              id: 'b_' + authData.user.id.slice(0, 8),
+              name: authData.user.user_metadata?.business_name || `${userObj.full_name}'s Enterprise`,
+              gstin: authData.user.user_metadata?.gstin || '',
+              phone: authData.user.user_metadata?.phone || '',
+              address: 'Registered Premises',
+              fy_start_month: 4,
+              default_currency: 'INR',
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            setBusinesses([userBusiness]);
+            setActiveBusiness(userBusiness);
+          }
+        } catch (e) {
+          const userBusiness = {
+            id: 'b_' + authData.user.id.slice(0, 8),
+            name: `${userObj.full_name}'s Enterprise`,
+            fy_start_month: 4,
+            default_currency: 'INR',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setBusinesses([userBusiness]);
+          setActiveBusiness(userBusiness);
+        }
+
         setSuccessMsg('Authentication successful! Redirecting to ERP Dashboard...');
         setTimeout(() => navigate('/dashboard'), 1000);
       }

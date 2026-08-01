@@ -138,6 +138,8 @@ const MOCK_INVOICES: TaxInvoice[] = [
   }
 ];
 
+import { fetchBusinessTableData } from '../../lib/dataStore';
+
 export default function TaxInvoicesPage() {
   const theme = useTheme();
   const { activeBusiness } = useAuthStore();
@@ -151,19 +153,10 @@ export default function TaxInvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<TaxInvoice | null>(null);
 
   // Queries
-  const { data: invoices = MOCK_INVOICES, isLoading } = useQuery({
+  const { data: invoices = [], isLoading } = useQuery({
     queryKey: ['tax-invoices', bizId],
-    queryFn: async () => {
-      if (!activeBusiness) return MOCK_INVOICES;
-      const { data, error } = await supabase
-        .from('tax_invoices')
-        .select('*, customers(name, gstin)')
-        .eq('business_id', bizId)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return (data?.length ? data : MOCK_INVOICES) as TaxInvoice[];
-    },
+    queryFn: () => fetchBusinessTableData<TaxInvoice>(bizId, 'tax_invoices', MOCK_INVOICES),
+    enabled: !!bizId,
   });
 
   // KPIs

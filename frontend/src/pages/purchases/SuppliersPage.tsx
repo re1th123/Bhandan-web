@@ -180,8 +180,12 @@ const MOCK_SUPPLIERS: SupplierItem[] = [
 const CATEGORIES = ['All', 'FMCG Distributors', 'Raw Materials', 'Packaging', 'Logistics'];
 const STATUSES = ['All', 'Active', 'Inactive', 'Overdue'];
 
+import { fetchBusinessTableData, insertBusinessTableData } from '../../lib/dataStore';
+import { useQueryClient } from '@tanstack/react-query';
+
 export default function SuppliersPage() {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const { activeBusiness } = useAuthStore();
   const businessId = activeBusiness?.id || null;
 
@@ -201,27 +205,45 @@ export default function SuppliersPage() {
     category: 'FMCG Distributors',
   });
 
-  // Query Supabase suppliers
-  const { data: suppliers = MOCK_SUPPLIERS } = useQuery({
+  // Query suppliers
+  const { data: suppliers = [] } = useQuery({
     queryKey: ['suppliers', businessId],
-    queryFn: async () => {
-      if (!businessId) return MOCK_SUPPLIERS;
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .eq('business_id', businessId);
-
-      if (error || !data || data.length === 0) return MOCK_SUPPLIERS;
-
-      return data.map((item: any, idx: number) => ({
-        ...item,
-        outstanding_balance: item.outstanding_balance ?? (idx % 2 === 0 ? 250000 : 80000),
-        overdue_balance: item.overdue_balance ?? (idx % 3 === 0 ? 50000 : 0),
-        last_purchase_date: item.last_purchase_date || '2026-07-18',
-        total_purchase_value: item.total_purchase_value ?? (idx * 500000 + 1000000),
-      }));
-    },
+    queryFn: () => fetchBusinessTableData<SupplierItem>(businessId, 'suppliers', MOCK_SUPPLIERS),
+    enabled: !!businessId,
   });
+
+  const handleSaveSupplier = async () => {
+    if (!newSupplier.name.trim()) return;
+
+    const itemToInsert: Partial<SupplierItem> = {
+      name: newSupplier.name.trim(),
+      phone: newSupplier.phone.trim(),
+      gstin: newSupplier.gstin.trim(),
+      pan: newSupplier.pan.trim(),
+      address: newSupplier.address.trim(),
+      payment_terms: newSupplier.payment_terms,
+      category: newSupplier.category,
+      is_active: true,
+      outstanding_balance: 0,
+      overdue_balance: 0,
+      last_purchase_date: new Date().toISOString().split('T')[0],
+      total_purchase_value: 0,
+    };
+
+    await insertBusinessTableData(businessId, 'suppliers', itemToInsert as SupplierItem);
+    queryClient.invalidateQueries({ queryKey: ['suppliers', businessId] });
+    setIsAddDialogOpen(false);
+
+    setNewSupplier({
+      name: '',
+      phone: '',
+      gstin: '',
+      pan: '',
+      address: '',
+      payment_terms: 'Net 30',
+      category: 'FMCG Distributors',
+    });
+  };
 
   // Filtered Suppliers
   const filteredSuppliers = useMemo(() => {
@@ -723,7 +745,7 @@ export default function SuppliersPage() {
           </Button>
           <Button
             variant="contained"
-            onClick={handleAddSupplierSubmit}
+            onClick={handleSaveSupplier}
             sx={{ bgcolor: '#0288D1', '&:hover': { bgcolor: '#0277BD' }, textTransform: 'none', px: 3 }}
           >
             Save Supplier

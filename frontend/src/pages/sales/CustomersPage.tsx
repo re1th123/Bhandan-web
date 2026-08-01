@@ -145,8 +145,12 @@ const MOCK_TOP_CUSTOMERS = [
   { name: 'Singh & Co', revenue: 640000, percentage: 40 },
 ];
 
+import { fetchBusinessTableData, insertBusinessTableData } from '../../lib/dataStore';
+import { useQueryClient } from '@tanstack/react-query';
+
 export default function CustomersPage() {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const { activeBusiness } = useAuthStore();
   const bizId = activeBusiness?.id;
 
@@ -155,21 +159,49 @@ export default function CustomersPage() {
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [selectedCustForSummary, setSelectedCustForSummary] = useState<any>(null);
 
-  // Queries (Mocked for now with fallback)
-  const { data: customers = MOCK_CUSTOMERS, isLoading } = useQuery({
+  // Form state
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustGstin, setNewCustGstin] = useState('');
+  const [newCustAddress, setNewCustAddress] = useState('');
+  const [newCustCreditLimit, setNewCustCreditLimit] = useState(100000);
+  const [newCustCategory, setNewCustCategory] = useState('Retail');
+  const [newCustPaymentTerms, setNewCustPaymentTerms] = useState('Net 30');
+
+  // Queries
+  const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers', bizId],
-    queryFn: async () => {
-      if (!bizId) return MOCK_CUSTOMERS;
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('business_id', bizId);
-      if (error) throw error;
-      return MOCK_CUSTOMERS; // Return mock for rich UI anyway, ideally map data
-    },
+    queryFn: () => fetchBusinessTableData<Customer>(bizId, 'customers', MOCK_CUSTOMERS),
     enabled: !!bizId,
-    initialData: MOCK_CUSTOMERS,
   });
+
+  const handleSaveCustomer = async () => {
+    if (!newCustName) return;
+    const newCustItem: Partial<Customer> = {
+      name: newCustName,
+      phone: newCustPhone || '+91 98765 00000',
+      gstin: newCustGstin,
+      address: newCustAddress,
+      category: newCustCategory,
+      credit_limit: Number(newCustCreditLimit) || 100000,
+      balance: 0,
+      available_credit: Number(newCustCreditLimit) || 100000,
+      last_purchase: new Date().toISOString().split('T')[0],
+      status: 'Active',
+      payment_terms: newCustPaymentTerms,
+      aging: { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 },
+    };
+
+    await insertBusinessTableData(bizId, 'customers', newCustItem as Customer);
+    queryClient.invalidateQueries({ queryKey: ['customers', bizId] });
+    setIsAddCustomerOpen(false);
+
+    // Reset form
+    setNewCustName('');
+    setNewCustPhone('');
+    setNewCustGstin('');
+    setNewCustAddress('');
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -488,29 +520,29 @@ export default function CustomersPage() {
         <DialogContent dividers>
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <TextField fullWidth label="Business Name" required variant="outlined" size="small" />
+              <TextField fullWidth label="Business Name" required variant="outlined" size="small" value={newCustName} onChange={(e) => setNewCustName(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField fullWidth label="Phone Number" required variant="outlined" size="small" />
+              <TextField fullWidth label="Phone Number" required variant="outlined" size="small" value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField fullWidth label="GSTIN" variant="outlined" size="small" />
+              <TextField fullWidth label="GSTIN" variant="outlined" size="small" value={newCustGstin} onChange={(e) => setNewCustGstin(e.target.value)} />
             </Grid>
             <Grid item xs={12}>
-              <TextField fullWidth label="Address" multiline rows={2} variant="outlined" size="small" />
+              <TextField fullWidth label="Address" multiline rows={2} variant="outlined" size="small" value={newCustAddress} onChange={(e) => setNewCustAddress(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField fullWidth label="Credit Limit (₹)" type="number" variant="outlined" size="small" />
+              <TextField fullWidth label="Credit Limit (₹)" type="number" variant="outlined" size="small" value={newCustCreditLimit} onChange={(e) => setNewCustCreditLimit(Number(e.target.value))} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField fullWidth select label="Category" variant="outlined" size="small" defaultValue="Retail">
+              <TextField fullWidth select label="Category" variant="outlined" size="small" value={newCustCategory} onChange={(e) => setNewCustCategory(e.target.value)}>
                 <MenuItem value="Retail">Retail</MenuItem>
                 <MenuItem value="Wholesale">Wholesale</MenuItem>
                 <MenuItem value="Distributor">Distributor</MenuItem>
               </TextField>
             </Grid>
             <Grid item xs={12}>
-              <TextField fullWidth select label="Payment Terms" variant="outlined" size="small" defaultValue="Net 30">
+              <TextField fullWidth select label="Payment Terms" variant="outlined" size="small" value={newCustPaymentTerms} onChange={(e) => setNewCustPaymentTerms(e.target.value)}>
                 <MenuItem value="Immediate">Immediate</MenuItem>
                 <MenuItem value="Net 15">Net 15</MenuItem>
                 <MenuItem value="Net 30">Net 30</MenuItem>
@@ -521,7 +553,7 @@ export default function CustomersPage() {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setIsAddCustomerOpen(false)} color="inherit">Cancel</Button>
-          <Button variant="contained" onClick={() => setIsAddCustomerOpen(false)} sx={{ bgcolor: '#5C6BC0', '&:hover': { bgcolor: '#3F51B5' } }}>
+          <Button variant="contained" onClick={handleSaveCustomer} sx={{ bgcolor: '#5C6BC0', '&:hover': { bgcolor: '#3F51B5' } }}>
             Save Customer
           </Button>
         </DialogActions>

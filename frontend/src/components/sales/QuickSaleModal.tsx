@@ -52,6 +52,7 @@ import {
 import dayjs from 'dayjs';
 import supabase from '../../lib/supabase';
 import useAuthStore from '../../stores/authStore';
+import { insertBusinessTableData } from '../../lib/dataStore';
 
 // Types
 export interface SaleLineItem {
@@ -292,19 +293,7 @@ export default function QuickSaleModal({ open, onClose, onSuccess }: QuickSaleMo
     };
 
     try {
-      if (activeBusiness?.id) {
-        await supabase.from('tax_invoices').insert({
-          business_id: activeBusiness.id,
-          invoice_no: invoiceNo,
-          customer_id: selectedCustomer.id,
-          date: invoiceDate,
-          due_date: dueDate,
-          total_amount: invoiceCalculations.grandTotal,
-          gst_amount: invoiceCalculations.totalGst,
-          payment_status: invoiceCalculations.paymentStatus,
-          items_json: items,
-        });
-      }
+      await insertBusinessTableData(bizId, 'tax_invoices', newInvoiceObj);
     } catch (e) {
       console.warn('Saving invoice fallback', e);
     }

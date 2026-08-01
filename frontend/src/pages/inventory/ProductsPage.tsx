@@ -108,8 +108,12 @@ const MOCK_MOVEMENT_DATA = [
 
 const CATEGORIES = ['All', 'Groceries', 'Snacks', 'Beverages', 'Personal Care'];
 
+import { fetchBusinessTableData, insertBusinessTableData } from '../../lib/dataStore';
+import { useQueryClient } from '@tanstack/react-query';
+
 export default function ProductsPage() {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const { activeBusiness } = useAuthStore();
   const businessId = activeBusiness?.id || 'b1';
 
@@ -118,32 +122,54 @@ export default function ProductsPage() {
   const [selectedWarehouse, setSelectedWarehouse] = useState('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
+  // Form state
+  const [prodName, setProdName] = useState('');
+  const [prodSku, setProdSku] = useState('');
+  const [prodHsn, setProdHsn] = useState('');
+  const [prodCategory, setProdCategory] = useState('Groceries');
+  const [prodMinStock, setProdMinStock] = useState(20);
+  const [prodCostPrice, setProdCostPrice] = useState(100);
+  const [prodWholesalePrice, setProdWholesalePrice] = useState(120);
+  const [prodPrice, setProdPrice] = useState(135);
+
   // Queries
-  const { data: products = MOCK_PRODUCTS, isLoading: productsLoading } = useQuery({
+  const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['products', businessId],
-    queryFn: async () => {
-      if (!activeBusiness) return MOCK_PRODUCTS;
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('business_id', businessId);
-      if (error) throw error;
-      return data.length ? (data as Product[]) : MOCK_PRODUCTS;
-    },
+    queryFn: () => fetchBusinessTableData<Product>(businessId, 'products', MOCK_PRODUCTS),
+    enabled: !!businessId,
   });
 
   const { data: warehouses = MOCK_WAREHOUSES } = useQuery({
     queryKey: ['warehouses', businessId],
-    queryFn: async () => {
-      if (!activeBusiness) return MOCK_WAREHOUSES;
-      const { data, error } = await supabase
-        .from('warehouses')
-        .select('*')
-        .eq('business_id', businessId);
-      if (error) throw error;
-      return data.length ? [{ id: 'all', name: 'All Warehouses', location: '' }, ...data] : MOCK_WAREHOUSES;
-    },
+    queryFn: () => fetchBusinessTableData<Warehouse>(businessId, 'warehouses', MOCK_WAREHOUSES),
+    enabled: !!businessId,
   });
+
+  const handleSaveProduct = async () => {
+    if (!prodName) return;
+    const newProd: Partial<Product> = {
+      name: prodName,
+      sku: prodSku || `SKU-${Date.now().toString().slice(-4)}`,
+      hsn_code: prodHsn || '19053100',
+      category: prodCategory,
+      cost_price: Number(prodCostPrice) || 0,
+      wholesale_price: Number(prodWholesalePrice) || 0,
+      price: Number(prodPrice) || 0,
+      min_stock_alert: Number(prodMinStock) || 10,
+      warehouse_id: 'w1',
+      is_active: true,
+      stock_qty: 100,
+    };
+
+    await insertBusinessTableData(businessId, 'products', newProd as Product);
+    queryClient.invalidateQueries({ queryKey: ['products', businessId] });
+    setIsAddDialogOpen(false);
+
+    // Reset form
+    setProdName('');
+    setProdSku('');
+    setProdHsn('');
+  };
 
   // Derived Data
   const filteredProducts = useMemo(() => {
@@ -450,18 +476,18 @@ export default function ProductsPage() {
         <DialogContent dividers>
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <TextField fullWidth label="Product Name" variant="outlined" size="small" />
+              <TextField fullWidth label="Product Name" required variant="outlined" size="small" value={prodName} onChange={(e) => setProdName(e.target.value)} />
             </Grid>
             <Grid item xs={6}>
-              <TextField fullWidth label="SKU" variant="outlined" size="small" />
+              <TextField fullWidth label="SKU" variant="outlined" size="small" value={prodSku} onChange={(e) => setProdSku(e.target.value)} />
             </Grid>
             <Grid item xs={6}>
-              <TextField fullWidth label="HSN Code" variant="outlined" size="small" />
+              <TextField fullWidth label="HSN Code" variant="outlined" size="small" value={prodHsn} onChange={(e) => setProdHsn(e.target.value)} />
             </Grid>
             <Grid item xs={6}>
               <FormControl fullWidth size="small">
                 <InputLabel>Category</InputLabel>
-                <Select label="Category" defaultValue="Groceries">
+                <Select label="Category" value={prodCategory} onChange={(e) => setProdCategory(e.target.value)}>
                   {CATEGORIES.filter(c => c !== 'All').map(c => (
                     <MenuItem key={c} value={c}>{c}</MenuItem>
                   ))}
@@ -469,22 +495,22 @@ export default function ProductsPage() {
               </FormControl>
             </Grid>
             <Grid item xs={6}>
-              <TextField fullWidth label="Min Stock Alert" type="number" variant="outlined" size="small" />
+              <TextField fullWidth label="Min Stock Alert" type="number" variant="outlined" size="small" value={prodMinStock} onChange={(e) => setProdMinStock(Number(e.target.value))} />
             </Grid>
             <Grid item xs={4}>
-              <TextField fullWidth label="Cost Price" type="number" variant="outlined" size="small" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
+              <TextField fullWidth label="Cost Price" type="number" variant="outlined" size="small" value={prodCostPrice} onChange={(e) => setProdCostPrice(Number(e.target.value))} InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
             </Grid>
             <Grid item xs={4}>
-              <TextField fullWidth label="Wholesale Price" type="number" variant="outlined" size="small" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
+              <TextField fullWidth label="Wholesale Price" type="number" variant="outlined" size="small" value={prodWholesalePrice} onChange={(e) => setProdWholesalePrice(Number(e.target.value))} InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
             </Grid>
             <Grid item xs={4}>
-              <TextField fullWidth label="Retail Price" type="number" variant="outlined" size="small" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
+              <TextField fullWidth label="Retail Price" type="number" variant="outlined" size="small" value={prodPrice} onChange={(e) => setProdPrice(Number(e.target.value))} InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 2, pt: 1 }}>
           <Button onClick={() => setIsAddDialogOpen(false)} color="inherit" sx={{ textTransform: 'none' }}>Cancel</Button>
-          <Button variant="contained" sx={{ bgcolor: '#5C6BC0', '&:hover': { bgcolor: '#3F51B5' }, textTransform: 'none' }}>
+          <Button variant="contained" onClick={handleSaveProduct} sx={{ bgcolor: '#5C6BC0', '&:hover': { bgcolor: '#3F51B5' }, textTransform: 'none' }}>
             Save Product
           </Button>
         </DialogActions>

@@ -215,20 +215,27 @@ const DashboardPage: React.FC = () => {
     enabled: !!bizId,
   });
 
-  // Use real or mock data
-  const revenue = invoicesData?.total || 4_85_000;
-  const receivables = invoicesData?.pending || 1_24_500;
-  const payables = purchasesData?.pending || 87_300;
-  const customers = (customersCount as number) || 48;
-  const lowStock = (lowStockCount as number) || 6;
+  // Demo mode check
+  const isDemo = !bizId || bizId === 'a0000000-0000-4000-8000-000000000001';
 
-  const journals = (recentJournals && recentJournals.length > 0) ? recentJournals : [
-    { journal_number: 'JV-001', entry_date: '2025-07-25', voucher_type: 'Sales', narration: 'Tax Invoice SI-2025-001' },
-    { journal_number: 'JV-002', entry_date: '2025-07-24', voucher_type: 'Payment', narration: 'Supplier payment - Ravi Traders' },
-    { journal_number: 'JV-003', entry_date: '2025-07-24', voucher_type: 'Purchase', narration: 'Purchase Invoice PI-2025-012' },
-    { journal_number: 'JV-004', entry_date: '2025-07-23', voucher_type: 'Receipt', narration: 'Customer payment - Rajesh Traders' },
-    { journal_number: 'JV-005', entry_date: '2025-07-22', voucher_type: 'Journal', narration: 'GST adjustment entry' },
-  ];
+  // Evaluate real vs demo metrics
+  const revenue = isDemo ? 4_85_000 : (invoicesData?.total ?? 0);
+  const receivables = isDemo ? 1_24_500 : (invoicesData?.pending ?? 0);
+  const payables = isDemo ? 87_300 : (purchasesData?.pending ?? 0);
+  const customers = isDemo ? 48 : (customersCount ?? 0);
+  const lowStock = isDemo ? 6 : (lowStockCount ?? 0);
+
+  const journals = (recentJournals && recentJournals.length > 0)
+    ? recentJournals
+    : isDemo
+    ? [
+        { journal_number: 'JV-001', entry_date: '2025-07-25', voucher_type: 'Sales', narration: 'Tax Invoice SI-2025-001' },
+        { journal_number: 'JV-002', entry_date: '2025-07-24', voucher_type: 'Payment', narration: 'Supplier payment - Ravi Traders' },
+        { journal_number: 'JV-003', entry_date: '2025-07-24', voucher_type: 'Purchase', narration: 'Purchase Invoice PI-2025-012' },
+        { journal_number: 'JV-004', entry_date: '2025-07-23', voucher_type: 'Receipt', narration: 'Customer payment - Rajesh Traders' },
+        { journal_number: 'JV-005', entry_date: '2025-07-22', voucher_type: 'Journal', narration: 'GST adjustment entry' },
+      ]
+    : [];
 
   const voucherColor = (type: string) => ({
     Sales: '#43A047', Purchase: '#E53935', Receipt: '#0288D1',
