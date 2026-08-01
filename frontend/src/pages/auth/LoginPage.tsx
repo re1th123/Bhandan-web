@@ -73,6 +73,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
   const setActiveBusiness = useAuthStore((s) => s.setActiveBusiness);
+  const setBusinesses = useAuthStore((s) => s.setBusinesses);
 
   const [tab, setTab] = useState<0 | 1>(0);
   const [showPassword, setShowPassword] = useState(false);
@@ -547,7 +548,7 @@ const LoginPage: React.FC = () => {
                 onChange={(_, val) => { setTab(val); setError(''); setSuccessMsg(''); }}
                 variant="fullWidth"
                 textColor="inherit"
-                IndicatorProps={{ style: { backgroundColor: '#5C6BC0', height: 3 } }}
+                TabIndicatorProps={{ style: { backgroundColor: '#5C6BC0', height: 3 } }}
               >
                 <Tab label="Sign In" sx={{ color: 'white', py: 2.5, fontWeight: 600 }} />
                 <Tab label="Register Business" sx={{ color: 'white', py: 2.5, fontWeight: 600 }} />

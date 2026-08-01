@@ -305,7 +305,7 @@ const DashboardPage: React.FC = () => {
             subtitle: 'Products below threshold',
           },
         ].map((kpi, i) => (
-          <Grid item xs={12} sm={6} md={4} lg={true} key={kpi.title}>
+          <Grid item xs={12} sm={6} md={4} lg={2.4} key={kpi.title}>
             <KpiCard {...kpi} index={i} />
           </Grid>
         ))}
