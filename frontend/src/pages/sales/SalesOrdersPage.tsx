@@ -38,15 +38,34 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-export default function SalesOrdersPage() {
+interface SalesOrdersPageProps {
+  openCreate?: boolean;
+  onCloseCreate?: () => void;
+}
+
+export default function SalesOrdersPage({ openCreate: externalOpenCreate, onCloseCreate }: SalesOrdersPageProps = {}) {
   const theme = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [openCreate, setOpenCreate] = useState(false);
+  const [internalOpenCreate, setInternalOpenCreate] = useState(false);
   const [openView, setOpenView] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
 
-  const filteredOrders = mockOrders.filter(order => {
+  const openCreate = externalOpenCreate !== undefined ? externalOpenCreate : internalOpenCreate;
+  const setOpenCreate = (open: boolean) => {
+    setInternalOpenCreate(open);
+    if (!open && onCloseCreate) {
+      onCloseCreate();
+    }
+  };
+  const [ordersList, setOrdersList] = useState<SalesOrder[]>(mockOrders);
+  const [newCustomer, setNewCustomer] = useState('');
+  const [newOrderDate, setNewOrderDate] = useState(dayjs().format('YYYY-MM-DD'));
+  const [lineItems, setLineItems] = useState<Array<{ product: string; qty: number; rate: number }>>([
+    { product: '', qty: 1, rate: 0 }
+  ]);
+
+  const filteredOrders = ordersList.filter(order => {
     const matchesSearch = order.orderNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
@@ -202,40 +221,142 @@ export default function SalesOrdersPage() {
         <DialogContent dividers>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Customer Name" placeholder="Select Customer" required />
+              <TextField 
+                fullWidth 
+                label="Customer Name" 
+                placeholder="Enter or select customer" 
+                value={newCustomer}
+                onChange={(e) => setNewCustomer(e.target.value)}
+                required 
+              />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField fullWidth type="date" label="Order Date" defaultValue={dayjs().format('YYYY-MM-DD')} InputLabelProps={{ shrink: true }} required />
+              <TextField 
+                fullWidth 
+                type="date" 
+                label="Order Date" 
+                value={newOrderDate}
+                onChange={(e) => setNewOrderDate(e.target.value)}
+                InputLabelProps={{ shrink: true }} 
+                required 
+              />
             </Grid>
             <Grid item xs={12}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Line Items</Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                <Typography variant="h6">Line Items</Typography>
+                <Typography variant="subtitle1" fontWeight="bold" color="primary">
+                  Total: {formatCurrency(lineItems.reduce((acc, item) => acc + (item.qty * item.rate), 0))}
+                </Typography>
+              </Box>
               <TableContainer component={Paper} variant="outlined">
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Product</TableCell>
+                      <TableCell>Product / Description</TableCell>
                       <TableCell align="right">Qty</TableCell>
                       <TableCell align="right">Rate (₹)</TableCell>
                       <TableCell align="right">Amount (₹)</TableCell>
+                      <TableCell align="center" sx={{ width: 50 }}>Action</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    <TableRow>
-                      <TableCell><TextField size="small" placeholder="Item Name" fullWidth /></TableCell>
-                      <TableCell align="right"><TextField size="small" type="number" sx={{ width: 80 }} /></TableCell>
-                      <TableCell align="right"><TextField size="small" type="number" sx={{ width: 100 }} /></TableCell>
-                      <TableCell align="right"><TextField size="small" disabled sx={{ width: 100 }} /></TableCell>
-                    </TableRow>
+                    {lineItems.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <TextField 
+                            size="small" 
+                            placeholder="Item Name" 
+                            fullWidth 
+                            value={item.product}
+                            onChange={(e) => {
+                              const newItems = [...lineItems];
+                              newItems[index].product = e.target.value;
+                              setLineItems(newItems);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <TextField 
+                            size="small" 
+                            type="number" 
+                            sx={{ width: 90 }}
+                            value={item.qty}
+                            onChange={(e) => {
+                              const newItems = [...lineItems];
+                              newItems[index].qty = Math.max(1, parseInt(e.target.value) || 0);
+                              setLineItems(newItems);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <TextField 
+                            size="small" 
+                            type="number" 
+                            sx={{ width: 110 }}
+                            value={item.rate}
+                            onChange={(e) => {
+                              const newItems = [...lineItems];
+                              newItems[index].rate = Math.max(0, parseFloat(e.target.value) || 0);
+                              setLineItems(newItems);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography fontWeight="medium">
+                            {formatCurrency(item.qty * item.rate)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <IconButton 
+                            size="small" 
+                            color="error"
+                            disabled={lineItems.length <= 1}
+                            onClick={() => {
+                              setLineItems(lineItems.filter((_, idx) => idx !== index));
+                            }}
+                          >
+                            <X size={16} />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </TableContainer>
-              <Button startIcon={<Plus size={16} />} sx={{ mt: 1 }}>Add Item</Button>
+              <Button 
+                startIcon={<Plus size={16} />} 
+                sx={{ mt: 1 }}
+                onClick={() => setLineItems([...lineItems, { product: '', qty: 1, rate: 0 }])}
+              >
+                Add Item
+              </Button>
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenCreate(false)}>Cancel</Button>
-          <Button variant="contained" onClick={() => setOpenCreate(false)}>Create Order</Button>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              if (!newCustomer.trim()) return;
+              const totalAmount = lineItems.reduce((acc, item) => acc + (item.qty * item.rate), 0);
+              const newOrder: SalesOrder = {
+                id: String(ordersList.length + 1),
+                orderNo: `SO-2024-00${ordersList.length + 1}`,
+                customerName: newCustomer,
+                date: newOrderDate,
+                itemsCount: lineItems.reduce((acc, item) => acc + item.qty, 0),
+                totalAmount,
+                status: 'Draft',
+              };
+              setOrdersList([newOrder, ...ordersList]);
+              setOpenCreate(false);
+              setNewCustomer('');
+              setLineItems([{ product: '', qty: 1, rate: 0 }]);
+            }}
+          >
+            Create Order
+          </Button>
         </DialogActions>
       </Dialog>
 

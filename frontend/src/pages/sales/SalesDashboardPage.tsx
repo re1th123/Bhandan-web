@@ -53,6 +53,7 @@ const DeliveryChallansPage = lazy(() => import('./DeliveryChallansPage'));
 const TaxInvoicesPage = lazy(() => import('./TaxInvoicesPage'));
 const CustomerPaymentsPage = lazy(() => import('./CustomerPaymentsPage'));
 const CreditNotesPage = lazy(() => import('./CreditNotesPage'));
+const QuickSaleModal = lazy(() => import('../../components/sales/QuickSaleModal'));
 
 const MotionCard = motion.create(Card);
 
@@ -122,6 +123,8 @@ export default function SalesDashboardPage() {
   const isDark = theme.palette.mode === 'dark';
   const { activeBusiness } = useAuthStore();
   const [activeTab, setActiveTab] = useState(0);
+  const [openCreateOrder, setOpenCreateOrder] = useState(false);
+  const [openQuickSale, setOpenQuickSale] = useState(false);
 
   // Query example - falls back to mock data
   const { data: dashboardData } = useQuery({
@@ -507,6 +510,10 @@ export default function SalesDashboardPage() {
             variant="outlined" 
             startIcon={<Plus size={18} />}
             sx={{ fontWeight: 600 }}
+            onClick={() => {
+              setActiveTab(2);
+              setOpenCreateOrder(true);
+            }}
           >
             New Sales Order
           </Button>
@@ -514,6 +521,7 @@ export default function SalesDashboardPage() {
             variant="outlined" 
             startIcon={<Plus size={18} />}
             sx={{ fontWeight: 600 }}
+            onClick={() => setOpenQuickSale(true)}
           >
             Tax Invoice
           </Button>
@@ -551,13 +559,27 @@ export default function SalesDashboardPage() {
         <Suspense fallback={<LoadingFallback />}>
           {activeTab === 0 && renderOverview()}
           {activeTab === 1 && <CustomersPage />}
-          {activeTab === 2 && <SalesOrdersPage />}
+          {activeTab === 2 && (
+            <SalesOrdersPage
+              openCreate={openCreateOrder}
+              onCloseCreate={() => setOpenCreateOrder(false)}
+            />
+          )}
           {activeTab === 3 && <DeliveryChallansPage />}
           {activeTab === 4 && <TaxInvoicesPage />}
           {activeTab === 5 && <CustomerPaymentsPage />}
           {activeTab === 6 && <CreditNotesPage />}
         </Suspense>
       </Box>
+
+      {/* Quick Sale / Tax Invoice Modal */}
+      <Suspense fallback={null}>
+        <QuickSaleModal
+          open={openQuickSale}
+          onClose={() => setOpenQuickSale(false)}
+          onSuccess={() => setOpenQuickSale(false)}
+        />
+      </Suspense>
     </Box>
   );
 }

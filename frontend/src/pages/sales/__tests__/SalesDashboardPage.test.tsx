@@ -102,4 +102,12 @@ describe('SalesDashboardPage', () => {
     expect(screen.getByText(/Collections Aging/i)).toBeInTheDocument();
     expect(screen.getAllByTestId('chart-container').length).toBeGreaterThan(0);
   });
+
+  it('clicking New Sales Order quick action switches to Sales Orders tab and opens creation dialog', () => {
+    render(<SalesDashboardPage />);
+    const newOrderBtn = screen.getByRole('button', { name: /New Sales Order/i });
+    fireEvent.click(newOrderBtn);
+    expect(screen.getByRole('tab', { name: /sales orders/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText(/Create New Sales Order/i)).toBeInTheDocument();
+  });
 });
